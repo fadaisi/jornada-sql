@@ -1,1 +1,95 @@
 Na aula 3 desenvolvemos um processo completo de transformação de dados em SQL, incluindo modelagem de tabela, limpeza e padronização de dados, além da criação de uma estrutura internacionalizada. Utilizei técnicas de ETL para migrar e traduzir os dados, e realizei validação com JOIN para garantir a integridade das informações.
+
+
+
+
+/* =========================================================================
+   PROJETO: MODELAGEM, LIMPEZA E INTERNACIONALIZAÇÃO DE DADOS (F1 DATASET)
+   OBJETIVO: Transformar uma base bruta em uma estrutura profissional bilíngue.
+   AUTOR: [fadaisi]
+   =========================================================================
+*/
+
+-- 1. CRIAÇÃO DA ESTRUTURA INICIAL (MODELAGEM)
+-- Definindo a tabela base com as colunas Numero, Nome, Central, ChefeEquipe e Uni.Potência.
+
+IF OBJECT_ID('dbo.equipes', 'U') IS NOT NULL DROP TABLE dbo.equipes;
+
+CREATE TABLE dbo.equipes (
+    Numero INT PRIMARY KEY,
+    Nome VARCHAR(100),
+    Central VARCHAR(100),
+    ChefeEquipe VARCHAR(100),
+    [Uni.Potência] VARCHAR(100)
+);
+
+-- Inserção de dados brutos (Exemplos do dataset trabalhado)
+INSERT INTO dbo.equipes (Numero, Nome, Central, ChefeEquipe, [Uni.Potência])
+VALUES 
+(1, 'Red Bull Racing', 'Milton Keynes', 'Christian Horner', 'Honda RBPT'),
+(5, 'Onça', 'Silverstone', 'Mike Krack', 'Mercedes'),
+(18, 'Toyota', 'Colônia', 'Tsutomu Tomita', 'Toyota'),
+(33, 'HRT', 'Madri', 'Colin Kolles', 'Cosworth'),
+(35, 'Super Aguri', 'Tóquio', 'Aguri Suzuki', 'Honda');
+
+
+-- 2. PADRONIZAÇÃO E LIMPEZA DE DADOS (DATA CLEANING)
+-- Ajustando nomes de cidades e equipes para garantir integridade antes da migração.
+
+UPDATE dbo.equipes
+SET Central = CASE 
+    WHEN TRIM(UPPER(Central)) = 'COLÔNIA' THEN 'Cologne'
+    WHEN TRIM(UPPER(Central)) = 'MADRI'   THEN 'Madrid'
+    WHEN TRIM(UPPER(Central)) = 'TÓQUIO'  THEN 'Tokyo'
+    ELSE Central 
+END;
+
+
+-- 3. MIGRAÇÃO E INTERNACIONALIZAÇÃO PARA O FRANCÊS (SCHEMA MIGRATION)
+-- Criando uma nova tabela (equipes_fr) já com os nomes das colunas e dados traduzidos.
+
+SELECT 
+    Numero,
+    CASE 
+        WHEN Nome = 'Onça' THEN 'Panthère' 
+        WHEN Nome = 'Flechas' THEN 'Flèches'
+        ELSE Nome 
+    END AS Nom,
+    CASE 
+        WHEN Central = 'Tokyo' THEN 'Tokyo'
+        WHEN Central = 'Madrid' THEN 'Madrid'
+        WHEN Central = 'Cologne' THEN 'Cologne'
+        WHEN Central = 'Módena' THEN 'Modène'
+        ELSE Central 
+    END AS Siège,
+    ChefeEquipe AS Patron, -- Renomeação funcional
+    [Uni.Potência] AS [Unité_de_Puissance]
+INTO dbo.equipes_fr
+FROM dbo.equipes;
+
+
+-- 4. RESOLUÇÃO DE ERROS DE METADADOS (REFATORAÇÃO)
+-- Corrigindo o erro Msg 15248 usando referências absolutas para renomear colunas.
+
+-- Renomeando 'Numero' para 'Numéro' (Adicionando o acento francês)
+EXEC sp_rename '[dbo].[equipes_fr].[Numero]', 'Numéro', 'COLUMN';
+
+-- Caso o 'Nom' ainda precise de ajuste fino
+-- EXEC sp_rename '[dbo].[equipes_fr].[Nom]', 'Nom', 'COLUMN';
+
+
+-- 5. AUDITORIA E COMPARAÇÃO DE DADOS (QA)
+-- Verificando se a tradução e a integridade dos IDs (Numero) coincidem entre as tabelas.
+
+SELECT 
+    A.Numero, 
+    A.Nome AS [Nome PT], 
+    B.Nom AS [Nom FR],
+    A.Central AS [Sede Original],
+    B.Siège AS [Siège FR]
+FROM dbo.equipes A
+INNER JOIN dbo.equipes_fr B ON A.Numero = B.Numéro
+ORDER BY A.Numero;
+
+-- Visualização Final da tabela Internacionalizada
+SELECT * FROM dbo.equipes_fr;
